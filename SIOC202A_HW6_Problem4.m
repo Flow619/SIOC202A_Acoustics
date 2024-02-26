@@ -21,6 +21,8 @@ x_source = 0;
 
 t_end = 10;    % end time of numerical approximation
 
+Save_Flag = "OFF";
+
 %% Set up Variables
 z = z_bounds(1):dz:z_bounds(2); % depth array
 
@@ -38,22 +40,19 @@ z_old = z_source;
 
 theta_old = launch_angle;
 
-if theta_old < 0
-    Angle_Sign = "Neg";
-elseif theta_old > 0 
-    Angle_Sign = "Pos";
-end
-
-
-figure
+% Create figure
+figure('units','normalized','outerposition',[0 0 1 1])
 hold on, grid on
-plot(x_old,z_old,'o')
-set(gca, 'YDir','reverse')
-
-end_loop = 0;    % Boolean to end following for loop (When reflect off the bottom)
+plot(x_old,z_old,'rx')
 
 
 for i = 1:length(t)
+
+    if theta_old < 0    % Determine if angle is positive or negative.
+        Angle_Sign = "Neg";
+    elseif theta_old > 0 
+        Angle_Sign = "Pos";
+    end
 
     c_old = mean( c.profile( c.z < (z_old + dz) & c.z > (z_old - dz) ) );  % Current sound of speed
 
@@ -72,9 +71,12 @@ for i = 1:length(t)
 
         theta_new = acosd( (c_new/c_old)*cosd(theta_old) );  % Snell's law, moving between sound speed layers.
 
+        if strcmp(Angle_Sign,"Neg")    % Override, for negative angles (cos is an even function!).
+            theta_new = -theta_new;
+        end
+
         if ~isreal(theta_new)  % if imag. # (assume at bottom boundary)
             theta_new = -theta_old; % flip the angle (@ boundary).
-            end_loop = 0;
         end
 
         c_x = c_new*cosd(theta_new);
@@ -90,18 +92,44 @@ for i = 1:length(t)
 
     end
 
-    plot(x_new,z_new,'o')
+    if z_new < 0    % Reflection at the ocean surface!
+        theta_new = -theta_old; % flip the angle (@ boundary).
+
+        c_x = c_new*cosd(theta_new);
+        c_z = c_new*sind(theta_new);
+
+        dx_timestep = c_x*dt;
+        dz_timestep = c_z*dt;
+
+        x_new = x_old + dx_timestep;
+        z_new = z_old + dz_timestep;
+
+        theta_old = theta_new;
+    end
+
+    plot(x_new,z_new,'k.')
 
     x_old = x_new;
     z_old = z_new;
 
-    if end_loop == 1
-        break
-    end
-
 end
 
 
+%% Plot
+set(gca, 'YDir','reverse')
+xlabel('X [m]')
+ylabel('Z [m]')
+title(['Acoustic Ray Trace:' newline ...
+    ,'dz = ',char(num2str(dz)),' m', ' ; ', ...
+    'Launch Angle = ',char(num2str(launch_angle)),'^{\circ}',...
+    ' ;',' t = ',char(num2str(t_end)), ' sec']);
+ax = gca;
+set(ax,'fontsize',20)
 
 
+%% Save Plot
 
+if strcmp(Save_Flag,"ON")
+    filename = ['AcousticRay_Angle',char(num2str(launch_angle)),'_dz_',char(num2str(dz)),'.jpg'];
+    exportgraphics(gcf,filename)
+end
