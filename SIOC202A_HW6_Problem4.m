@@ -38,6 +38,13 @@ z_old = z_source;
 
 theta_old = launch_angle;
 
+if theta_old < 0
+    Angle_Sign = "Neg";
+elseif theta_old > 0 
+    Angle_Sign = "Pos";
+end
+
+
 figure
 hold on, grid on
 plot(x_old,z_old,'o')
